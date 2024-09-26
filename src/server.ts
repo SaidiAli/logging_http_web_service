@@ -1,5 +1,6 @@
 import app from ".";
 import http from "http";
+import db from "./db";
 
 /**
  * Get port from environment and store in Express.
@@ -14,13 +15,31 @@ app.set("port", port);
 
 const server = http.createServer(app);
 
-/**
- * Listen on provided port, on all network interfaces.
- */
+let retries = 5;
+(async () => {
+  while (retries) {
+    try {
+      await db.connect(); // connect to database
 
-server.listen(port);
-server.on("error", onError);
-server.on("listening", onListening);
+      server.listen(port); // Listen on provided port, on all network interfaces.
+      server.on("error", onError);
+      server.on("listening", () => {
+        let addr = server.address();
+        let bind =
+          typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
+        console.log("Listening on " + bind);
+      });
+
+      break;
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message);
+      }
+      retries -= 1;
+      await new Promise((res) => setTimeout(res, 5000));
+    }
+  }
+})();
 
 /**
  * Normalize a port into a number, string, or false.
@@ -66,14 +85,4 @@ function onError(error: any) {
     default:
       throw error;
   }
-}
-
-/**
- * Event listener for HTTP server "listening" event.
- */
-
-function onListening() {
-  let addr = server.address();
-  let bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
-  console.log("Listening on " + bind);
 }
