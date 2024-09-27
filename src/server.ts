@@ -21,6 +21,27 @@ let retries = 5;
     try {
       await db.connect(); // connect to database
 
+      // Create tables if they don't exist
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          password VARCHAR(255) NOT NULL,
+          role VARCHAR(50) NOT NULL DEFAULT 'user'
+        );
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS logs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          timestamp TIMESTAMP NOT NULL,
+          level VARCHAR(50) NOT NULL,
+          text TEXT NOT NULL,
+          hasLocalhostUrl BOOLEAN NOT NULL
+        );
+      `);
+
       server.listen(port); // Listen on provided port, on all network interfaces.
       server.on("error", onError);
       server.on("listening", () => {

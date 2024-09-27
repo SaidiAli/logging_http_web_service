@@ -5,8 +5,16 @@ import compression from "compression";
 import session from "express-session";
 import dotenv from "dotenv";
 import morgan from "morgan";
+import User from "./types/User";
+import authRouter from "./routes/auth.routes";
 
 dotenv.config();
+
+declare module "express" {
+  interface Request {
+    user?: User;
+  }
+}
 
 const app = express(); // express server
 
@@ -25,10 +33,10 @@ app.use(
   })
 );
 
-// app.use(express.static('public'));
+app.use("/api", authRouter);
 
-app.get("/", (req, res) => {
-  res.send("Hello World!");
+app.get("/health-check", (req, res) => {
+  res.send("server is up and running!");
 });
 
 export default app;
