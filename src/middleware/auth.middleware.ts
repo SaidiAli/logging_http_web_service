@@ -1,27 +1,23 @@
 import { NextFunction, Request, Response } from "express";
 import jwt, { verify } from "jsonwebtoken";
 import User, { Roles } from "../types/User";
-import { generateAccessToken } from "../utils/jwt";
-import db from "src/db";
+import { generateAccessToken, verifyToken } from "../utils/jwt";
+import db from "../db";
+import createHttpError from "http-errors";
 
-const authenticateUser =
-  (role: Roles) => async (req: Request, res: Response, next: NextFunction) => {
+export const authenticateUser =
+  (roles: Roles[]) =>
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const bearerToken = req.headers.authorization;
+      const bearer = req.headers.authorization;
 
-      if (!bearerToken) {
-        next("Bearer token is missing");
-      }
+      if (!bearer)
+        return res.status(401).json({ message: "Not authenticated" });
 
-      const [accessToken, refreshToken] = bearerToken.split(" ");
+      const accessToken = bearer.split(" ")[1];
 
-      if (!accessToken || !refreshToken) {
-        next("Invalid bearer token format");
-      }
-
-      if (!accessToken && !refreshToken) {
-        next("Not authenticated");
-      }
+      if (!accessToken)
+        return res.status(401).json({ message: "Not authenticated" });
 
       const payload: { role: any; sub: any } = verify(
         accessToken,
@@ -31,7 +27,8 @@ const authenticateUser =
         role: string;
       };
 
-      if (payload.role !== role) return next();
+      if (!roles.includes(payload.role))
+        return res.status(401).json({ message: "Unauthorized" });
 
       const q = await db.query("SELECT * FROM users WHERE id = $1", [
         payload.sub,
@@ -39,10 +36,17 @@ const authenticateUser =
 
       const user = q.rows[0] as User;
 
-      if (!user) next("User does not exist.");
+      if (!user)
+        return res.status(401).json({ message: "User does not exist" });
+
+      req.user = user;
 
       return next();
     } catch (error) {
-      next(error);
+      if (error instanceof jwt.JsonWebTokenError) {
+        return res.status(401).json({ message: error.message });
+      } else if (error instanceof jwt.TokenExpiredError) {
+        return res.status(401).json({ message: "Token has expired" });
+      }
     }
   };

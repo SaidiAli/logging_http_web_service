@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import db from "../db";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { generateAccessToken, generateRefreshToken } from "../utils/jwt";
+import { generateAccessToken } from "../utils/jwt";
 import User from "../types/User";
 
 // authentication data validation schema
@@ -26,19 +26,26 @@ const authSchema = z.object({
     .refine((val) => !val.startsWith("/") && !val.startsWith("."), {
       message: "password cannot start with '/' or '.'",
     }),
+
+  role: z
+    .enum(["user", "admin"], {
+      invalid_type_error: "role must be 'user' or 'admin'",
+    })
+    .optional(),
 });
 
-export default authSchema;
-
+/**
+ * Controller to register user route
+ */
 export async function registerUser(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
-    const validated = authSchema.safeParse({ email, password }); // validate the request body
+    const validated = authSchema.safeParse({ email, password, role }); // validate the request body
 
     if (!validated.success) {
       return res.status(400).json({
@@ -59,10 +66,17 @@ export async function registerUser(
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // save user to db
-    await db.query(
-      "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING *",
-      [email, hashedPassword]
-    );
+    if (role) {
+      await db.query(
+        "INSERT INTO users (email, password, role) VALUES ($1, $2, $3) RETURNING *",
+        [email, hashedPassword, role]
+      );
+    } else {
+      await db.query(
+        "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING *",
+        [email, hashedPassword]
+      );
+    }
 
     res.send();
   } catch (error) {
@@ -70,6 +84,9 @@ export async function registerUser(
   }
 }
 
+/**
+ * Controller to authenticate user
+ */
 export async function loginUser(
   req: Request,
   res: Response,
@@ -110,14 +127,8 @@ export async function loginUser(
       role: user.role,
     });
 
-    const refreshToken = generateRefreshToken({
-      id: user.id,
-      role: user.role,
-    });
-
     res.json({
       accessToken,
-      refreshToken,
     });
   } catch (error) {
     next(error);

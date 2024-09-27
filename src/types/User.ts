@@ -3,11 +3,11 @@ export enum Roles {
   USER = "user",
 }
 
-class User {
+type User = {
   id: string;
   email: string;
   password: string;
   role: Roles;
-}
+};
 
 export default User;

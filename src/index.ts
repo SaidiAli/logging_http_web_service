@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import morgan from "morgan";
 import User from "./types/User";
 import authRouter from "./routes/auth.routes";
+import logsRouter from "./routes/logs.routes";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(compression());
 app.use(morgan("tiny"));
+app.use(express.json({ limit: '5mb' })); // limit request body size to 5mb
 
 app.use(
   session({
@@ -34,6 +36,7 @@ app.use(
 );
 
 app.use("/api", authRouter);
+app.use("/api/logs", logsRouter);
 
 app.get("/health-check", (req, res) => {
   res.send("server is up and running!");
